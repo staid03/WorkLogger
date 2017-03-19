@@ -9,7 +9,9 @@ SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
 ;Version	Date		Author		Notes
 ;	0.1		14-MAR-2017	Staid03		Initial
 ;	0.2		15-MAR-2017	Staid03		Updating for C drive. Fixed an issue with Y flags not cleaning up the FileLocation.
-;	0.3		19-MAR-2017	Staid03		Added md5checksum retrieval and addition to JSON file
+;	0.3		19-MAR-2017	Staid03		Added MD5checksum retrieval and addition to JSON file
+;	0.4		19-MAR-2017	Staid03		Fixing output so it allows talking marks in the JSON file (searching for escape chars for JSON) " '
+;									Escape char = \  eg. \"		\'
 
 formattime , atime ,, yyyyMMdd_HHmmss
 
@@ -19,13 +21,14 @@ outputFile = FileStockTake_%givenNameForTheDrive%_%atime%.json
 jsonProgram = "C:\Program Files (x86)\Notepad++\notepad++.exe"
 md5checksumProgram = fciv.exe
 checksumoutfile = ~checksumoutfile.xml
-md5checksum = null				;if the md5checksumProgram doesn't exist or can't be found then md5checksum will equal "null" string
+MD5checksum = null				;if the md5checksumProgram doesn't exist or can't be found then MD5checksum will equal "null" string
 exclusionExt = xls|doc|png		;just examples
 exclusionExtArray := StrSplit(exclusionExt, "|")
-exclusionDir = $RECYCLE.BIN|system|System32|Program Files|DIAD|eSupport|Logs|NVIDIA|PerfLogs|Users|Windows|Boot|ProgramData
+;exclusionDir = $RECYCLE.BIN|system|System32|Program Files|DIAD|eSupport|Logs|NVIDIA|PerfLogs|Users|Windows|Boot|ProgramData
+exclusionDir = $RECYCLE.BIN
 exclusionDirArray := StrSplit(exclusionDir, "|")
 
-testlimit = 2
+testlimit = 1000
 anum = 1
 
 main:
@@ -34,16 +37,16 @@ main:
 	FormatTime , nTimeStamp , , yyyyMMddHHmm
 	;begin looping through each file from the specified source folder
 	oDirCheck = 
-	gosub , beginJSONFile					;create the JSON file and the first few lines
-	loop , %infolder%*.* , 0 , 1
+	GoSub , beginJSONFile					;create the JSON file and the first few lines
+	Loop , %infolder%*.* , 0 , 1
 	{
 		;search through the specified folder for files to collect metadata on		
-		gosub , resetVars					;reset the variables
+		GoSub , resetVars					;reset the variables
 		SplitPath , a_loopfilefullpath , oFileName , oDir , oExt , oNameNoExt , oDrive
-		gosub , excludedFileCheck			;check if this file/folder has been excluded from being recorded
-		ifequal , excluded , y				;if it has been returned to exclude this file/folder, then move onto the next file
+		GoSub , excludedFileCheck			;check if this file/folder has been excluded from being recorded
+		IfEqual , excluded , y				;if it has been returned to exclude this file/folder, then move onto the next file
 		{
-			continue
+			Continue
 		}
 		ifnotequal , oDirCheck , %oDir%
 		{
@@ -99,7 +102,7 @@ main:
 	gosub , endJSONFile
 	run , %jsonProgram% %outputFile%
 }
-return
+Return
 
 resetVars:
 ;reset the variables for the next iteration of the loop
@@ -112,7 +115,7 @@ resetVars:
 	oCreatedTimeRaw = 
 	excluded = n
 }
-return
+Return
 
 excludedFileCheck:
 ;check for any excluded file types
@@ -127,7 +130,7 @@ excludedFileCheck:
 		}
 	}	
 }
-return 
+Return 
 
 cleanVar:
 ;runs through the vars that could have talking marks in them to remove the talking marks for JSON file
@@ -137,7 +140,7 @@ cleanVar:
 	ifinstring , varToClean , "		;"
 	{
 		msgbox ,,, file found with talking marks - %a_loopfilefullpath%
-		stringreplace , cleanVarOut , varToClean , " , - , A		;"
+		stringreplace , cleanVarOut , varToClean , " , \" , A
 		stringleft , cleanedVarType , varToClean , 2
 		ifequal , cleanedVarType , FN
 		{
@@ -153,37 +156,57 @@ cleanVar:
 		}
 	}
 	
-	ifinstring , varToClean , '
-	{
-		msgbox ,,, file found with single talking mark - %a_loopfilefullpath%
-		stringreplace , cleanVarOut , varToClean , ' , - , A		;"
-		stringleft , cleanedVarType , varToClean , 2
-		ifequal , cleanedVarType , FN
-		{
-			FNVarClean = Y
-		}
-		ifequal , cleanedVarType , DR
-		{
-			DRVarClean = Y
-		}
-		ifequal , cleanedVarType , EX
-		{
-			EXVarClean = Y
-		}
-	}
-		stringtrimleft , cleanVarOut , varToClean , 8
+	; ifinstring , varToClean , '
+	; {
+		; msgbox ,,, file found with single talking mark - %a_loopfilefullpath%
+		; stringreplace , cleanVarOut , varToClean , ' , - , A		;"
+		; stringleft , cleanedVarType , varToClean , 2
+		; ifequal , cleanedVarType , FN
+		; {
+			; FNVarClean = Y
+		; }
+		; ifequal , cleanedVarType , DR
+		; {
+			; DRVarClean = Y
+		; }
+		; ifequal , cleanedVarType , EX
+		; {
+			; EXVarClean = Y
+		; }
+	; }
+	
+	stringtrimleft , cleanVarOut , varToClean , 8
 }
-return 
+Return 
 
 generateMD5Checksum:
 {
 	filedelete , %checksumoutfile%
+	MD5checksum = 		;reset in case it fails
+	gosub , checkFCIVcrash
+	sleep , 100
 	runwait , %comspec% /c fciv.exe "%a_loopfilefullpath%" > %checksumoutfile% ,, hide
-	sleep , 10
+	sleep , 100
+	gosub , checkFCIVcrash
 	filereadline , md5line , %checksumoutfile% , 4
-	stringleft , md5checksum , md5line , 32
+	stringleft , MD5checksum , md5line , 32
 }
-return
+Return
+
+checkFCIVcrash:
+{
+	IfWinExist , fciv.exe , `&Debug
+	{
+		FormatTime , zTimeStamp , , yyyyMMddHHmm
+		crashLogText = %zTimeStamp%,%a_loopfilefullpath%
+		FileAppend , %crashLogText%`n, FCIV_crashes.log
+		WinActivate , fciv.exe , `&Debug
+		{
+			Send , {a_tab}{enter}
+		}
+	}
+}
+Return 
 
 beginJSONFile:
 {
@@ -194,7 +217,7 @@ beginJSONFile:
 	
 	fileappend , %outputline% , %outputFile%
 }
-return 
+Return 
 
 fileLocationJSON:
 {
@@ -213,7 +236,7 @@ newfileLocationJSON:
 	
 	fileappend , %outputline% , %outputFile%
 }
-return
+Return
 
 createJSON:
 ;create the JSON file
@@ -226,14 +249,14 @@ createJSON:
 	outputline = %outputline%			"FileExt": "%oExt%"`n
 	outputline = %outputline%			"FileExtCleanRequired": "%EXVarClean%"`n
 	outputline = %outputline%			"FileSizeBytes": "%oSize%"`n
+	outputline = %outputline%			"MD5checksum": "%MD5checksum%"`n
 	outputline = %outputline%			"FileTimeModified": "%oModifiedTimeRaw%"`n
 	outputline = %outputline%			"FileTimeCreated": "%oCreatedTimeRaw%"`n
-	outputline = %outputline%			"md5checksum": "%md5checksum%"`n
 	outputline = %outputline%		}
 	
 	fileappend , %outputline% , %outputFile%
 }
-return 
+Return 
 
 endJSONFile:
 {
@@ -242,4 +265,4 @@ endJSONFile:
 	
 	fileappend , %outputline% , %outputFile%
 }
-return 
+Return 
