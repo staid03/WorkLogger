@@ -9,10 +9,13 @@ SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
 
 ;Version	Date		Author		Notes
 ;	0.1		17-MAR-2017	Staid03		Initial
+;	0.2		08-APR-2017	Staid03		Including username on logon (could be any user on the computer)
 
 EnvGet , computerName , COMPUTERNAME
+EnvGet , userName , USERNAME
 
 workLoggerOutputFile = workLogger_%computerName%.csv
+fileappend , Login by %USERNAME%`n, %workLoggerOutputFile%
 sleepTimeSeconds = 4
 sleepTime := sleepTimeSeconds * 1000
 previousWindow = null
