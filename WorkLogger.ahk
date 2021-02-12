@@ -14,7 +14,7 @@ notify_lock_unlock()
 ;	0.2		08-APR-2017	Staid03		Including username on logon (could be any user on the computer)
 ;	0.3		05-MAR-2019	Staid03		Adding workstation lock and unlock events
 ;	0.4		12-FEB-2021	Staid03		Trimming the window so it removes unnecessary whitespace
-;	0.4b	12-FEB-2021	Staid03		Tightened up a little redundant code
+;	0.4b		12-FEB-2021	Staid03		Tightened up a little redundant code
 
 computerName := getEnvironmentVariable(computername)
 userName := getEnvironmentVariable(username)
